@@ -223,7 +223,8 @@ const APP_CONFIG = {
   LIFF_ID: '2011575494-ss9QLFk3',
   FACILITY_NAME: 'โรงพยาบาลส่งเสริมสุขภาพตำบลบ้านชมภูพานเหนือ',
   DEFAULT_CENTER: [17.10, 103.95],
-  REQUEST_TIMEOUT_MS: 20000,
+  // Apps Script may need extra time to warm up and recalculate a busy queue.
+  REQUEST_TIMEOUT_MS: 120000,
   POLL_MS: 60000
 };
 // ================================================================
@@ -238,7 +239,9 @@ const state = {
   marker: null,
   homeLocation: null,
   waitChart: null,
-  pollTimer: null
+  pollTimer: null,
+  loadingDashboard: false,
+  loadingQueue: false
 };
 
 function isConfigured(){
@@ -282,6 +285,11 @@ async function api(action,payload={},withAuth=true){
     let j; try{j=JSON.parse(text)}catch(_){throw new Error('Backend ไม่ได้ส่ง JSON กลับมา')}
     if(!j.ok) throw new Error(j.error?.message||'เกิดข้อผิดพลาดจาก Backend');
     return j.data;
+  }catch(error){
+    if(error?.name==='AbortError'){
+      throw new Error('Backend ใช้เวลาตอบกลับนานเกิน 2 นาที กรุณากดอัปเดตอีกครั้ง');
+    }
+    throw error;
   }finally{clearTimeout(t)}
 }
 
@@ -335,6 +343,8 @@ function startPoll(){
 }
 
 async function loadDashboard(showToast=true){
+  if(state.loadingDashboard) return;
+  state.loadingDashboard=true;
   try{
     const d=await api('getDashboard');
     renderKpis(d.kpis||{});
@@ -342,6 +352,7 @@ async function loadDashboard(showToast=true){
     document.getElementById('lastSync').textContent='อัปเดต '+new Intl.DateTimeFormat('th-TH',{timeStyle:'short'}).format(new Date());
     if(d.facilityName){document.getElementById('facilityTitle').textContent=d.facilityName;APP_CONFIG.FACILITY_NAME=d.facilityName}
   }catch(e){ if(showToast) toast(e.message); renderApiError('dashboardQueue',e.message)}
+  finally{state.loadingDashboard=false}
 }
 function renderKpis(k){
   const items=[
@@ -353,12 +364,15 @@ function renderKpis(k){
 function renderApiError(id,msg){document.getElementById(id).innerHTML=`<div class="empty">เชื่อมต่อ Backend ไม่สำเร็จ<br><small>${esc(msg)}</small></div>`}
 
 async function loadQueue(showToast=true){
+  if(state.loadingQueue) return;
+  state.loadingQueue=true;
   try{
     const clinicId=document.getElementById('queueClinic')?.value||'';
     const d=await api('getQueue',{clinicId,date:new Date().toISOString().slice(0,10)});
     renderQueueTable('queueTable',d.queue||d||[],true);
     if(d.clinics) fillClinicSelect(d.clinics);
   }catch(e){if(showToast)toast(e.message);renderApiError('queueTable',e.message)}
+  finally{state.loadingQueue=false}
 }
 function fillClinicSelect(list){
   const s=document.getElementById('queueClinic'); if(!s||s.dataset.loaded) return;
