@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0284c7">
+<title>Smart Queue & Travel Care</title>
+<link rel="preconnect" href="https://unpkg.com">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+:root{
+  --bg:#ecf9ff; --surface:#ffffff; --surface2:#f5fbff; --ink:#12344a; --muted:#648296;
+  --primary:#0284c7; --primary2:#38bdf8; --primary3:#0ea5e9; --navy:#075985;
+  --line:#d7edf8; --ok:#15966a; --warn:#d88a08; --danger:#dc4b55; --shadow:0 18px 50px rgba(2,132,199,.13);
+  --r:22px;
+}
+*{box-sizing:border-box} html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;color:var(--ink);background:
+radial-gradient(circle at 0 0,#d9f4ff 0,transparent 33%),
+radial-gradient(circle at 100% 0,#c6efff 0,transparent 28%),var(--bg)}
+button,input,select,textarea{font:inherit} button{cursor:pointer}
+.hidden{display:none!important}
+.app{min-height:100vh}
+.topbar{height:72px;background:rgba(255,255,255,.88);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);
+display:flex;align-items:center;justify-content:space-between;padding:0 22px;position:sticky;top:0;z-index:1000}
+.brand{display:flex;align-items:center;gap:12px}.logo{width:44px;height:44px;border-radius:15px;display:grid;place-items:center;color:#fff;
+background:linear-gradient(135deg,var(--primary),#67d5ff);box-shadow:0 10px 25px rgba(2,132,199,.3);font-size:22px}
+.brand h1{font-size:18px;margin:0}.brand small{display:block;color:var(--muted);margin-top:2px}
+.top-actions{display:flex;gap:8px;align-items:center}.pill{border-radius:999px;padding:8px 12px;background:#e9f8ff;color:#036b9f;font-weight:800;font-size:13px}
+.layout{display:grid;grid-template-columns:250px 1fr;min-height:calc(100vh - 72px)}
+.sidebar{background:linear-gradient(180deg,#075985,#073e60);padding:18px 12px;color:#fff}
+.navbtn{width:100%;border:0;background:transparent;color:#d9f4ff;text-align:left;padding:12px 14px;border-radius:14px;margin:3px 0;font-weight:700}
+.navbtn:hover,.navbtn.active{background:rgba(255,255,255,.14);color:#fff}
+.content{padding:24px;min-width:0}
+.pagehead{display:flex;justify-content:space-between;align-items:end;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.pagehead h2{margin:0;font-size:28px}.pagehead p{margin:5px 0 0;color:var(--muted)}
+.grid{display:grid;gap:16px}.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card{background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:18px}
+.kpi .label{color:var(--muted);font-size:13px;font-weight:700}.kpi .value{font-size:30px;font-weight:900;margin:6px 0}.kpi .hint{font-size:12px;color:var(--muted)}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.grow{flex:1}
+.btn{border:0;border-radius:14px;padding:11px 15px;font-weight:800;background:#e8f7ff;color:#075985}
+.btn.primary{background:linear-gradient(135deg,var(--primary),var(--primary2));color:#fff;box-shadow:0 10px 20px rgba(2,132,199,.22)}
+.btn.ok{background:#e8fbf4;color:#0f7a59}.btn.warn{background:#fff3dd;color:#9a6200}.btn.danger{background:#ffebee;color:#b82938}
+.input{width:100%;border:1px solid #cce6f3;background:#fbfeff;border-radius:14px;padding:12px 13px;outline:none}.input:focus{border-color:#57bfee;box-shadow:0 0 0 3px #d9f4ff}
+.field{display:grid;gap:7px}.field label{font-size:13px;color:#45697f;font-weight:800}
+.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:16px}table{width:100%;border-collapse:collapse;min-width:940px}
+th,td{padding:12px 11px;text-align:left;border-bottom:1px solid #e7f3f9;font-size:13px}th{background:#f2fbff;color:#42677d;position:sticky;top:0}
+.badge{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:900;background:#edf7fb;color:#547185}
+.badge.ok{background:#e4f8f0;color:#147252}.badge.go{background:#e3f6ff;color:#087aaf}.badge.warn{background:#fff1d8;color:#986000}.badge.danger{background:#ffe5e8;color:#b6323f}
+.empty{padding:42px;text-align:center;color:var(--muted)}
+.hero{background:linear-gradient(135deg,#05689b,#0798d8 55%,#60d2ff);color:#fff;border-radius:28px;padding:24px;box-shadow:0 20px 45px rgba(2,132,199,.22)}
+.hero h2{font-size:30px;margin:0 0 8px}.hero p{margin:0;opacity:.92}
+.patient-shell{max-width:720px;margin:24px auto;padding:0 16px 90px}.patient-card{background:#fff;border:1px solid var(--line);box-shadow:var(--shadow);border-radius:24px;padding:18px;margin-top:14px}
+.queue-big{text-align:center;padding:20px}.queue-big .num{font-size:64px;font-weight:1000;color:var(--primary);line-height:1}.queue-big .eta{font-size:24px;font-weight:900;margin-top:10px}
+.trip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.trip .mini{background:#f0faff;border-radius:16px;padding:12px;text-align:center}.trip strong{display:block;font-size:18px}
+.action-stack{display:grid;gap:10px;margin-top:14px}.action-stack .btn{padding:15px;font-size:16px}
+#map{height:390px;border-radius:18px;overflow:hidden;border:1px solid var(--line)}
+.login{min-height:100vh;display:grid;place-items:center;padding:20px}.login-card{width:min(440px,100%);background:#fff;border-radius:28px;box-shadow:0 25px 70px rgba(2,132,199,.2);padding:24px;border:1px solid var(--line)}
+.login-card .logo{width:60px;height:60px;font-size:30px;margin-bottom:14px}.login-card h1{margin:0 0 6px}.login-card p{color:var(--muted);margin:0 0 18px}
+.tabs{display:flex;gap:8px;background:#eef9ff;padding:6px;border-radius:16px;margin-bottom:18px}.tab{flex:1;border:0;background:transparent;padding:10px;border-radius:12px;font-weight:900;color:#5e7b8e}.tab.active{background:#fff;color:#036c9f;box-shadow:0 4px 15px rgba(2,132,199,.1)}
+.notice{padding:13px 14px;border-radius:14px;background:#e9f8ff;color:#11688f;font-size:13px;border:1px solid #cfeefa}.notice.warn{background:#fff5df;color:#8d6100;border-color:#ffe3a6}
+.toast{position:fixed;right:18px;bottom:18px;z-index:3000;max-width:380px;background:#0b4665;color:#fff;padding:13px 15px;border-radius:14px;box-shadow:0 15px 35px rgba(0,0,0,.18);opacity:0;transform:translateY(15px);pointer-events:none;transition:.2s}
+.toast.show{opacity:1;transform:none}.spinner{width:18px;height:18px;border:2px solid #bce9ff;border-top-color:#087fb7;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.modalback{position:fixed;inset:0;background:rgba(4,43,67,.48);z-index:2500;display:grid;place-items:center;padding:18px}.modal{width:min(760px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:24px;padding:20px;box-shadow:0 30px 80px rgba(0,0,0,.24)}
+.bottomnav{display:none}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:820px){
+ .layout{display:block}.sidebar{display:none}.content{padding:16px 14px 88px}.topbar{height:64px;padding:0 14px}.brand small{display:none}.brand h1{font-size:15px}.top-actions .pill{display:none}
+ .kpis{grid-template-columns:repeat(2,1fr)}.formgrid{grid-template-columns:1fr}.pagehead h2{font-size:24px}
+ .bottomnav{position:fixed;z-index:1800;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(5,1fr);background:rgba(255,255,255,.96);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:8px 6px calc(8px + env(safe-area-inset-bottom))}
+ .bottomnav button{border:0;background:transparent;color:#638095;font-size:11px;font-weight:800;padding:7px 2px}.bottomnav button span{font-size:20px;display:block}
+}
+@media(max-width:520px){.kpis{grid-template-columns:1fr 1fr}.card{padding:15px}.hero{padding:20px}.hero h2{font-size:25px}.trip{grid-template-columns:1fr 1fr}.trip .mini:last-child{grid-column:1/-1}}
+</style>
+</head>
+<body>
+<div id="toast" class="toast"></div>
+
+<div id="loginView" class="login">
+  <div class="login-card">
+    <div class="logo">🏥</div>
+    <h1>Smart Queue & Travel Care</h1>
+    <p>ระบบคิวอัจฉริยะและแจ้งเตือนเวลาเดินทาง รพ.สต.</p>
+    <div id="configWarn" class="notice warn hidden">กรุณาใส่ GAS_URL และ LIFF_ID ใน APP_CONFIG ก่อนใช้งานจริง</div>
+    <div class="tabs">
+      <button class="tab active" id="staffTab" onclick="switchLogin('staff')">เจ้าหน้าที่</button>
+      <button class="tab" id="patientTab" onclick="switchLogin('patient')">ผู้ป่วย</button>
+    </div>
+    <div id="staffLogin">
+      <div class="field"><label>ชื่อผู้ใช้</label><input id="username" class="input" value="admin" autocomplete="username"></div>
+      <div class="field" style="margin-top:12px"><label>รหัสผ่าน</label><input id="password" class="input" type="password" autocomplete="current-password"></div>
+      <button class="btn primary" style="width:100%;margin-top:16px" onclick="staffLoginAction()">เข้าสู่ระบบ</button>
+      <div class="notice" style="margin-top:14px">บัญชีเริ่มต้นตามข้อกำหนด: admin / 1234 และควรถูกบังคับเปลี่ยนรหัสผ่านหลังเข้าใช้ครั้งแรก</div>
+    </div>
+    <div id="patientLogin" class="hidden">
+      <button class="btn primary" style="width:100%" onclick="startPatientLiff()">เปิดผ่าน LINE เพื่อรับคิว</button>
+      <div class="notice" style="margin-top:14px">ระบบจะใช้ LIFF เพื่อยืนยัน LINE ของผู้ป่วย และส่ง Token ไปตรวจสอบที่ GAS ฝั่ง Server</div>
+    </div>
+  </div>
+</div>
+
+<div id="staffApp" class="app hidden">
+  <header class="topbar">
+    <div class="brand"><div class="logo">🏥</div><div><h1 id="facilityTitle">Smart Queue & Travel Care</h1><small>ระบบคิวอัจฉริยะ รพ.สต.</small></div></div>
+    <div class="top-actions"><span class="pill" id="staffName">เจ้าหน้าที่</span><button class="btn" onclick="logout()">ออกจากระบบ</button></div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar">
+      <button class="navbtn active" data-page="dashboard" onclick="showPage('dashboard',this)">▦ Dashboard</button>
+      <button class="navbtn" data-page="queue" onclick="showPage('queue',this)">🎫 จัดการคิว</button>
+      <button class="navbtn" data-page="appointments" onclick="showPage('appointments',this)">📅 นัดหมาย</button>
+      <button class="navbtn" data-page="patients" onclick="showPage('patients',this)">👥 ผู้ป่วย</button>
+      <button class="navbtn" data-page="reports" onclick="showPage('reports',this)">📊 รายงาน</button>
+      <button class="navbtn" data-page="settings" onclick="showPage('settings',this)">⚙️ ตั้งค่าระบบ</button>
+    </aside>
+    <main class="content">
+      <section id="page-dashboard" class="page">
+        <div class="pagehead"><div><h2>Dashboard</h2><p>ภาพรวมคิวและการเดินทางแบบใกล้ Real-Time</p></div><button class="btn primary" onclick="loadDashboard()">↻ อัปเดต</button></div>
+        <div class="grid kpis" id="kpiGrid"></div>
+        <div class="card" style="margin-top:16px">
+          <div class="row"><div class="grow"><strong>คิวที่ต้องติดตาม</strong><div style="color:var(--muted);font-size:13px">เรียงตามความเร่งด่วนของเวลาออกจากบ้าน</div></div><span id="lastSync" class="badge">ยังไม่ซิงก์</span></div>
+          <div id="dashboardQueue" style="margin-top:14px"></div>
+        </div>
+      </section>
+
+      <section id="page-queue" class="page hidden">
+        <div class="pagehead"><div><h2>จัดการคิว</h2><p>เรียกคิว เริ่มบริการ เสร็จสิ้น ข้าม และ No Show</p></div><div class="row"><select id="queueClinic" class="input" style="width:auto" onchange="loadQueue()"><option value="">ทุกคลินิก</option></select><button class="btn primary" onclick="loadQueue()">↻ อัปเดต</button></div></div>
+        <div class="card"><div id="queueTable"></div></div>
+      </section>
+
+      <section id="page-appointments" class="page hidden">
+        <div class="pagehead"><div><h2>นัดหมาย</h2><p>สร้างและจัดการนัดหมายผู้ป่วย</p></div><button class="btn primary" onclick="openAppointmentModal()">+ นัดหมายใหม่</button></div>
+        <div class="card"><div id="appointmentTable" class="empty">เลือก “นัดหมายใหม่” หรือกดอัปเดตข้อมูลจากระบบหลังเชื่อม GAS</div></div>
+      </section>
+
+      <section id="page-patients" class="page hidden">
+        <div class="pagehead"><div><h2>ผู้ป่วย</h2><p>ข้อมูลสำหรับผูก LINE และพิกัดบ้าน โดยแสดงข้อมูลเท่าที่จำเป็น</p></div><button class="btn" onclick="loadPatients()">↻ อัปเดต</button></div>
+        <div class="card"><div id="patientTable" class="empty">ยังไม่ได้โหลดข้อมูลผู้ป่วย</div></div>
+      </section>
+
+      <section id="page-reports" class="page hidden">
+        <div class="pagehead"><div><h2>รายงาน & CQI</h2><p>Waiting Time, ETA Accuracy, No Show และประสิทธิผลการแจ้งเตือน</p></div><button class="btn" onclick="loadReports()">↻ อัปเดต</button></div>
+        <div class="grid" style="grid-template-columns:2fr 1fr">
+          <div class="card"><canvas id="waitChart" height="130"></canvas></div>
+          <div class="card" id="reportSummary"><div class="empty">ยังไม่มีข้อมูลรายงาน</div></div>
+        </div>
+      </section>
+
+      <section id="page-settings" class="page hidden">
+        <div class="pagehead"><div><h2>ตั้งค่าระบบ</h2><p>ข้อมูลหน่วยบริการและค่าที่ไม่ใช่ Secret</p></div></div>
+        <div class="card">
+          <div class="formgrid">
+            <div class="field"><label>ชื่อหน่วยบริการ</label><input id="sFacilityName" class="input"></div>
+            <div class="field"><label>โทรศัพท์</label><input id="sPhone" class="input"></div>
+            <div class="field"><label>Latitude</label><input id="sLat" class="input" type="number" step="any"></div>
+            <div class="field"><label>Longitude</label><input id="sLng" class="input" type="number" step="any"></div>
+            <div class="field"><label>Timezone</label><input id="sTimezone" class="input" value="Asia/Bangkok"></div>
+            <div class="field"><label>Notification Threshold (นาที)</label><input id="sThreshold" class="input" type="number" value="15"></div>
+          </div>
+          <div class="field" style="margin-top:14px"><label>ที่อยู่</label><textarea id="sAddress" class="input" rows="3"></textarea></div>
+          <button class="btn primary" style="margin-top:14px" onclick="saveSettings()">บันทึกการตั้งค่า</button>
+          <div class="notice" style="margin-top:14px">LINE Token, Routes API Key, Session Secret และ Secret อื่น ๆ ต้องอยู่ใน Script Properties ของ GAS เท่านั้น ไม่แสดงในหน้านี้</div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <nav class="bottomnav">
+    <button onclick="showPage('dashboard')"><span>▦</span>Dashboard</button>
+    <button onclick="showPage('queue')"><span>🎫</span>คิว</button>
+    <button onclick="showPage('appointments')"><span>📅</span>นัด</button>
+    <button onclick="showPage('patients')"><span>👥</span>ผู้ป่วย</button>
+    <button onclick="showPage('settings')"><span>⚙️</span>ตั้งค่า</button>
+  </nav>
+</div>
+
+<div id="patientApp" class="hidden">
+  <div class="patient-shell">
+    <div class="hero">
+      <div style="font-size:13px;opacity:.9">🏥 <span id="pFacility">Smart Queue & Travel Care</span></div>
+      <h2 style="margin-top:8px">คิวของฉัน</h2>
+      <p>ระบบจะบอกเวลาที่เหมาะสมในการออกจากบ้าน เพื่อให้คุณไม่ต้องมารอนาน</p>
+    </div>
+    <div id="patientRegister" class="patient-card">
+      <h3 style="margin-top:0">ลงทะเบียนรับแจ้งเตือนคิว</h3>
+      <div class="field"><label>HN</label><input id="pHN" class="input" placeholder="เช่น 001234"></div>
+      <div class="field" style="margin-top:12px"><label>เลขท้ายโทรศัพท์ 4 ตัว</label><input id="pPhone4" class="input" inputmode="numeric" maxlength="4" placeholder="เช่น 6789"></div>
+      <label class="row" style="align-items:flex-start;margin-top:14px"><input id="pConsent" type="checkbox" style="margin-top:4px"><span style="font-size:13px;color:var(--muted)">ยินยอมให้หน่วยบริการใช้ข้อมูลนัดหมาย เลขคิว พิกัดบ้าน และ LINE เพื่อคำนวณเวลาเดินทางและแจ้งเตือนการรับบริการเท่านั้น</span></label>
+      <button class="btn primary" style="width:100%;margin-top:14px" onclick="linkPatient()">ยืนยันการลงทะเบียน</button>
+    </div>
+
+    <div id="patientQueueCard" class="patient-card hidden">
+      <div class="queue-big">
+        <div style="color:var(--muted);font-weight:800">คิวของคุณ</div>
+        <div class="num" id="myQueueNo">—</div>
+        <div class="eta" id="myETA">คาดถึงคิว —</div>
+        <div id="myStatus" class="badge go" style="margin-top:10px">กำลังคำนวณ</div>
+      </div>
+      <div class="trip">
+        <div class="mini"><span>🏠 ระยะทาง</span><strong id="myDistance">—</strong></div>
+        <div class="mini"><span>🚗 เวลาเดินทาง</span><strong id="myTravel">—</strong></div>
+        <div class="mini"><span>⏰ ควรออก</span><strong id="myDeparture">—</strong></div>
+      </div>
+      <div class="action-stack">
+        <button class="btn primary" onclick="confirmDeparture()">🚗 ฉันกำลังออกจากบ้าน</button>
+        <button class="btn ok" onclick="confirmArrival()">📍 ฉันมาถึงแล้ว</button>
+        <button class="btn" onclick="openLocationModal()">🏠 แก้ไขตำแหน่งบ้าน</button>
+        <button class="btn" onclick="loadMyQueue()">↻ อัปเดตสถานะ</button>
+      </div>
+      <div class="notice warn" style="margin-top:14px">หากมีอาการฉุกเฉิน ไม่ต้องรอคิวออนไลน์ กรุณาติดต่อหน่วยบริการหรือระบบฉุกเฉินตามแนวทางของพื้นที่ทันที</div>
+    </div>
+  </div>
+</div>
+
+<div id="modalHost"></div>
+
+<script>
+// ======================== แก้ไขเฉพาะส่วนนี้ ========================
+const APP_CONFIG = {
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbxVB5xh129Hxu-X8Gb-Km4kFx8_amXEzP7q8OH4VyybPjKdKlIOlrwTz6MvB6ChO6S1Uw/exec',
+  LIFF_ID: 'PASTE_LIFF_ID_HERE',
+  FACILITY_NAME: 'โรงพยาบาลส่งเสริมสุขภาพตำบลบ้านชมภูพานเหนือ',
+  DEFAULT_CENTER: [17.10, 103.95],
+  REQUEST_TIMEOUT_MS: 20000,
+  POLL_MS: 60000
+};
+// ================================================================
+
+const state = {
+  token: localStorage.getItem('sq_session') || '',
+  user: JSON.parse(localStorage.getItem('sq_user') || 'null'),
+  liffIdToken: '',
+  patientLinked: false,
+  currentPage: 'dashboard',
+  map: null,
+  marker: null,
+  homeLocation: null,
+  waitChart: null,
+  pollTimer: null
+};
+
+function isConfigured(){
+  return APP_CONFIG.GAS_URL && !APP_CONFIG.GAS_URL.includes('PASTE_') ;
+}
+function toast(msg){
+  const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),3200);
+}
+function esc(v=''){return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function fmtTime(v){
+  if(!v) return '—';
+  const d=new Date(v); if(Number.isNaN(d.getTime())) return String(v);
+  return new Intl.DateTimeFormat('th-TH',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Bangkok'}).format(d)+' น.';
+}
+function fmtDateTime(v){
+  if(!v) return '—'; const d=new Date(v); if(Number.isNaN(d.getTime())) return String(v);
+  return new Intl.DateTimeFormat('th-TH',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Bangkok'}).format(d);
+}
+function statusBadge(s){
+  const x=String(s||'').toUpperCase();
+  const cls=['ARRIVED','COMPLETED'].includes(x)?'ok':['DEPARTED','IN_SERVICE'].includes(x)?'go':['LATE_RISK','NO_SHOW'].includes(x)?'danger':['PREPARE','SHOULD_DEPART','WAITING'].includes(x)?'warn':'';
+  const labels={ARRIVED:'มาถึงแล้ว',COMPLETED:'เสร็จสิ้น',DEPARTED:'กำลังเดินทาง',IN_SERVICE:'กำลังรับบริการ',LATE_RISK:'เสี่ยงมาไม่ทัน',NO_SHOW:'ไม่มาตามนัด',PREPARE:'เตรียมตัว',SHOULD_DEPART:'ควรออกจากบ้าน',WAITING:'รอคิว',SCHEDULED:'นัดหมาย'};
+  return `<span class="badge ${cls}">${esc(labels[x]||s||'—')}</span>`;
+}
+
+async function api(action,payload={},withAuth=true){
+  if(!isConfigured()) throw new Error('ยังไม่ได้ตั้งค่า GAS_URL ใน APP_CONFIG');
+  const controller=new AbortController(); const t=setTimeout(()=>controller.abort(),APP_CONFIG.REQUEST_TIMEOUT_MS);
+  try{
+    const body={action,payload,requestId:crypto.randomUUID?crypto.randomUUID():String(Date.now())};
+    if(withAuth && state.token) body.sessionToken=state.token;
+    const r=await fetch(APP_CONFIG.GAS_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(body),
+      signal:controller.signal,
+      redirect:'follow'
+    });
+    const text=await r.text();
+    let j; try{j=JSON.parse(text)}catch(_){throw new Error('Backend ไม่ได้ส่ง JSON กลับมา')}
+    if(!j.ok) throw new Error(j.error?.message||'เกิดข้อผิดพลาดจาก Backend');
+    return j.data;
+  }finally{clearTimeout(t)}
+}
+
+function switchLogin(type){
+  const staff=type==='staff';
+  document.getElementById('staffLogin').classList.toggle('hidden',!staff);
+  document.getElementById('patientLogin').classList.toggle('hidden',staff);
+  document.getElementById('staffTab').classList.toggle('active',staff);
+  document.getElementById('patientTab').classList.toggle('active',!staff);
+}
+
+async function staffLoginAction(){
+  const username=document.getElementById('username').value.trim();
+  const password=document.getElementById('password').value;
+  if(!username||!password) return toast('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');
+  try{
+    const data=await api('login',{username,password},false);
+    state.token=data.sessionToken; state.user=data.user;
+    localStorage.setItem('sq_session',state.token); localStorage.setItem('sq_user',JSON.stringify(state.user));
+    enterStaff();
+    if(data.forceChangePassword) toast('กรุณาเปลี่ยนรหัสผ่านเริ่มต้นหลังเข้าใช้งาน');
+  }catch(e){toast(e.message)}
+}
+function enterStaff(){
+  document.getElementById('loginView').classList.add('hidden');
+  document.getElementById('patientApp').classList.add('hidden');
+  document.getElementById('staffApp').classList.remove('hidden');
+  document.getElementById('staffName').textContent=state.user?.displayName||state.user?.username||'เจ้าหน้าที่';
+  loadDashboard();
+  startPoll();
+}
+function logout(){
+  try{ if(state.token) api('logout',{},true).catch(()=>{}); }catch(_){}
+  localStorage.removeItem('sq_session');localStorage.removeItem('sq_user'); state.token='';state.user=null;
+  clearInterval(state.pollTimer);
+  document.getElementById('staffApp').classList.add('hidden');document.getElementById('patientApp').classList.add('hidden');document.getElementById('loginView').classList.remove('hidden');
+}
+
+function showPage(name,btn){
+  state.currentPage=name;
+  document.querySelectorAll('.page').forEach(p=>p.classList.add('hidden'));
+  document.getElementById('page-'+name)?.classList.remove('hidden');
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.page===name));
+  if(name==='queue') loadQueue();
+  if(name==='reports') loadReports();
+  if(name==='settings') loadSettings();
+}
+function startPoll(){
+  clearInterval(state.pollTimer);
+  state.pollTimer=setInterval(()=>{if(state.currentPage==='dashboard')loadDashboard(false);if(state.currentPage==='queue')loadQueue(false)},APP_CONFIG.POLL_MS);
+}
+
+async function loadDashboard(showToast=true){
+  try{
+    const d=await api('getDashboard');
+    renderKpis(d.kpis||{});
+    renderQueueTable('dashboardQueue',d.queue||[],false);
+    document.getElementById('lastSync').textContent='อัปเดต '+new Intl.DateTimeFormat('th-TH',{timeStyle:'short'}).format(new Date());
+    if(d.facilityName){document.getElementById('facilityTitle').textContent=d.facilityName;APP_CONFIG.FACILITY_NAME=d.facilityName}
+  }catch(e){ if(showToast) toast(e.message); renderApiError('dashboardQueue',e.message)}
+}
+function renderKpis(k){
+  const items=[
+    ['กำลังให้บริการ',k.inService??0,'🩺'],['รอคิว',k.waiting??0,'🎫'],['มาถึงแล้ว',k.arrived??0,'📍'],['กำลังเดินทาง',k.departed??0,'🚗'],
+    ['ยังไม่ออกจากบ้าน',k.notDeparted??0,'🏠'],['เสร็จสิ้น',k.completed??0,'✅'],['No Show',k.noShow??0,'⚠️'],['เวลารอเฉลี่ย',`${k.avgWaitMinutes??0} นาที`,'⏱️']
+  ];
+  document.getElementById('kpiGrid').innerHTML=items.map(x=>`<div class="card kpi"><div class="label">${x[2]} ${x[0]}</div><div class="value">${esc(x[1])}</div><div class="hint">ข้อมูลจากคิววันนี้</div></div>`).join('');
+}
+function renderApiError(id,msg){document.getElementById(id).innerHTML=`<div class="empty">เชื่อมต่อ Backend ไม่สำเร็จ<br><small>${esc(msg)}</small></div>`}
+
+async function loadQueue(showToast=true){
+  try{
+    const clinicId=document.getElementById('queueClinic')?.value||'';
+    const d=await api('getQueue',{clinicId,date:new Date().toISOString().slice(0,10)});
+    renderQueueTable('queueTable',d.queue||d||[],true);
+    if(d.clinics) fillClinicSelect(d.clinics);
+  }catch(e){if(showToast)toast(e.message);renderApiError('queueTable',e.message)}
+}
+function fillClinicSelect(list){
+  const s=document.getElementById('queueClinic'); if(!s||s.dataset.loaded) return;
+  s.innerHTML='<option value="">ทุกคลินิก</option>'+list.map(c=>`<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');s.dataset.loaded='1';
+}
+function renderQueueTable(id,rows,actions){
+  const host=document.getElementById(id);
+  if(!rows.length){host.innerHTML='<div class="empty">ยังไม่มีคิวในช่วงเวลานี้</div>';return}
+  host.innerHTML=`<div class="tablewrap"><table><thead><tr><th>คิว</th><th>ผู้ป่วย</th><th>คลินิก</th><th>ETA</th><th>ระยะทาง</th><th>เดินทาง</th><th>ควรออก</th><th>สถานะ</th>${actions?'<th>จัดการ</th>':''}</tr></thead><tbody>
+  ${rows.map(r=>`<tr>
+  <td><strong>${esc(r.queueNo||'—')}</strong></td>
+  <td>${esc(r.maskedName||r.name||'—')}<br><small style="color:var(--muted)">HN ${esc(r.hn||'—')}</small></td>
+  <td>${esc(r.clinicName||'—')}</td><td>${fmtTime(r.eta)}</td><td>${r.distanceKm!=null?esc(r.distanceKm)+' กม.':'—'}</td>
+  <td>${r.travelMinutes!=null?esc(r.travelMinutes)+' นาที':'—'}</td><td>${fmtTime(r.departureTime)}</td><td>${statusBadge(r.travelStatus||r.queueStatus)}</td>
+  ${actions?`<td><div class="row"><button class="btn" onclick="queueAction('callQueue','${esc(r.queueId)}')">เรียก</button><button class="btn ok" onclick="queueAction('startService','${esc(r.queueId)}')">เริ่ม</button><button class="btn primary" onclick="queueAction('finishService','${esc(r.queueId)}')">เสร็จ</button><button class="btn warn" onclick="queueAction('skipQueue','${esc(r.queueId)}')">ข้าม</button><button class="btn danger" onclick="queueAction('noShow','${esc(r.queueId)}')">No Show</button></div></td>`:''}
+  </tr>`).join('')}</tbody></table></div>`;
+}
+async function queueAction(action,queueId){
+  try{await api(action,{queueId});toast('บันทึกการจัดการคิวแล้ว');loadQueue();loadDashboard(false)}catch(e){toast(e.message)}
+}
+
+function openAppointmentModal(){
+  const html=`<div class="modalback" onclick="if(event.target===this)closeModal()"><div class="modal">
+  <div class="row"><div class="grow"><h3 style="margin:0">สร้างนัดหมายใหม่</h3><p style="color:var(--muted)">กรอกข้อมูลที่จำเป็น</p></div><button class="btn" onclick="closeModal()">✕</button></div>
+  <div class="formgrid">
+    <div class="field"><label>HN</label><input id="aHN" class="input"></div>
+    <div class="field"><label>วันที่นัด</label><input id="aDate" type="date" class="input"></div>
+    <div class="field"><label>เวลานัด</label><input id="aTime" type="time" class="input"></div>
+    <div class="field"><label>Clinic ID</label><input id="aClinic" class="input" placeholder="เช่น DM"></div>
+    <div class="field"><label>Priority</label><select id="aPriority" class="input"><option value="NORMAL">ปกติ</option><option value="URGENT">เร่งด่วนตามดุลยพินิจเจ้าหน้าที่</option></select></div>
+    <div class="field"><label>Service Point</label><input id="aPoint" class="input"></div>
+  </div>
+  <div class="field" style="margin-top:14px"><label>หมายเหตุ</label><textarea id="aNote" class="input"></textarea></div>
+  <button class="btn primary" style="width:100%;margin-top:16px" onclick="createAppointment()">บันทึกนัดหมาย</button>
+  </div></div>`;
+  document.getElementById('modalHost').innerHTML=html;
+}
+function closeModal(){document.getElementById('modalHost').innerHTML=''}
+async function createAppointment(){
+  try{
+    const payload={hn:aHN.value.trim(),appointmentDate:aDate.value,appointmentTime:aTime.value,clinicId:aClinic.value.trim(),priority:aPriority.value,servicePoint:aPoint.value.trim(),note:aNote.value.trim()};
+    await api('createAppointment',payload);closeModal();toast('สร้างนัดหมายแล้ว');
+  }catch(e){toast(e.message)}
+}
+async function loadPatients(){
+  try{
+    const d=await api('getPatients',{page:1,pageSize:100});
+    const rows=d.items||d||[]; const host=document.getElementById('patientTable');
+    if(!rows.length){host.innerHTML='<div class="empty">ไม่พบข้อมูลผู้ป่วย</div>';return}
+    host.innerHTML=`<div class="tablewrap"><table><thead><tr><th>HN</th><th>ชื่อ</th><th>LINE</th><th>พิกัดบ้าน</th><th>โทรศัพท์</th><th>อัปเดต</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.hn)}</td><td>${esc(r.maskedName||r.name)}</td><td>${r.lineLinked?'✅ เชื่อมแล้ว':'—'}</td><td>${r.locationConfirmed?'✅ ยืนยันแล้ว':'—'}</td><td>${esc(r.maskedPhone||'—')}</td><td>${fmtDateTime(r.updatedAt)}</td></tr>`).join('')}</tbody></table></div>`;
+  }catch(e){toast(e.message);renderApiError('patientTable',e.message)}
+}
+
+async function loadSettings(){
+  try{
+    const s=await api('getSettings');
+    sFacilityName.value=s.Facility_Name||s.facilityName||'';sPhone.value=s.Phone||s.phone||'';sLat.value=s.Facility_Lat||s.facilityLat||'';sLng.value=s.Facility_Lng||s.facilityLng||'';sTimezone.value=s.Timezone||'Asia/Bangkok';sThreshold.value=s.Notification_Threshold||15;sAddress.value=s.Address||s.address||'';
+  }catch(e){toast(e.message)}
+}
+async function saveSettings(){
+  try{
+    await api('updateSettings',{Facility_Name:sFacilityName.value.trim(),Phone:sPhone.value.trim(),Facility_Lat:Number(sLat.value),Facility_Lng:Number(sLng.value),Timezone:sTimezone.value.trim(),Notification_Threshold:Number(sThreshold.value),Address:sAddress.value.trim()});
+    toast('บันทึกการตั้งค่าแล้ว');
+  }catch(e){toast(e.message)}
+}
+
+async function loadReports(){
+  try{
+    const d=await api('getReports',{range:'30d'});
+    const labels=d.waitingTrend?.map(x=>x.date)||[];
+    const vals=d.waitingTrend?.map(x=>x.avgWaitMinutes)||[];
+    if(state.waitChart)state.waitChart.destroy();
+    if(window.Chart){
+      state.waitChart=new Chart(document.getElementById('waitChart'),{type:'line',data:{labels,datasets:[{label:'เวลารอเฉลี่ย (นาที)',data:vals,tension:.3,fill:true}]},options:{responsive:true,plugins:{legend:{display:true}},scales:{y:{beginAtZero:true}}}});
+    }
+    const s=d.summary||{};
+    document.getElementById('reportSummary').innerHTML=`<h3 style="margin-top:0">สรุป 30 วัน</h3>
+      <div class="trip" style="grid-template-columns:1fr 1fr"><div class="mini">Waiting<strong>${esc(s.avgWaitMinutes??0)} นาที</strong></div><div class="mini">No Show<strong>${esc(s.noShowRate??0)}%</strong></div><div class="mini">ETA Error<strong>${esc(s.avgEtaErrorMinutes??0)} นาที</strong></div><div class="mini">LINE Success<strong>${esc(s.notificationSuccessRate??0)}%</strong></div></div>`;
+  }catch(e){toast(e.message);document.getElementById('reportSummary').innerHTML=`<div class="empty">${esc(e.message)}</div>`}
+}
+
+// ---------------- Patient / LIFF ----------------
+async function startPatientLiff(){
+  if(!APP_CONFIG.LIFF_ID || APP_CONFIG.LIFF_ID.includes('PASTE_')) return toast('กรุณาตั้งค่า LIFF_ID ก่อน');
+  try{
+    await liff.init({liffId:APP_CONFIG.LIFF_ID});
+    if(!liff.isLoggedIn()){liff.login({redirectUri:window.location.href});return}
+    state.liffIdToken=liff.getIDToken()||'';
+    const verify=await api('verifyLineIdentity',{idToken:state.liffIdToken},false);
+    state.patientLinked=!!verify.linked;
+    document.getElementById('loginView').classList.add('hidden');document.getElementById('patientApp').classList.remove('hidden');
+    document.getElementById('pFacility').textContent=verify.facilityName||APP_CONFIG.FACILITY_NAME;
+    if(verify.linked){document.getElementById('patientRegister').classList.add('hidden');document.getElementById('patientQueueCard').classList.remove('hidden');await loadMyQueue()}
+  }catch(e){toast(e.message||'ไม่สามารถเปิด LIFF ได้')}
+}
+async function linkPatient(){
+  if(!pConsent.checked) return toast('กรุณายินยอมก่อนลงทะเบียน');
+  if(!pHN.value.trim()||pPhone4.value.trim().length!==4) return toast('กรุณากรอก HN และเลขท้ายโทรศัพท์ 4 ตัว');
+  try{
+    await api('linkPatient',{idToken:state.liffIdToken,hn:pHN.value.trim(),phoneLast4:pPhone4.value.trim(),consent:true,consentVersion:'1.0'},false);
+    document.getElementById('patientRegister').classList.add('hidden');document.getElementById('patientQueueCard').classList.remove('hidden');toast('ลงทะเบียนสำเร็จ');await loadMyQueue();
+  }catch(e){toast(e.message)}
+}
+async function loadMyQueue(){
+  try{
+    const d=await api('getMyQueue',{idToken:state.liffIdToken},false);
+    myQueueNo.textContent=d.queueNo||'—';myETA.textContent='คาดถึงคิว '+fmtTime(d.eta);myDistance.textContent=d.distanceKm!=null?d.distanceKm+' กม.':'—';myTravel.textContent=d.travelMinutes!=null?d.travelMinutes+' นาที':'—';myDeparture.textContent=fmtTime(d.departureTime);myStatus.outerHTML=`<span id="myStatus">${statusBadge(d.travelStatus||d.queueStatus)}</span>`;
+  }catch(e){toast(e.message)}
+}
+async function confirmDeparture(){
+  try{await api('confirmDeparture',{idToken:state.liffIdToken},false);toast('บันทึกว่าเริ่มเดินทางแล้ว');loadMyQueue()}catch(e){toast(e.message)}
+}
+async function confirmArrival(){
+  try{await api('confirmArrival',{idToken:state.liffIdToken},false);toast('บันทึกว่ามาถึงแล้ว');loadMyQueue()}catch(e){toast(e.message)}
+}
+
+function openLocationModal(){
+  document.getElementById('modalHost').innerHTML=`<div class="modalback"><div class="modal">
+  <div class="row"><div class="grow"><h3 style="margin:0">📍 ปักหมุดบ้านของคุณ</h3><p style="color:var(--muted)">ลากหมุดหรือแตะแผนที่ แล้วกดยืนยัน</p></div><button class="btn" onclick="closeLocationModal()">✕</button></div>
+  <div id="map"></div>
+  <div class="row" style="margin-top:14px"><button class="btn" onclick="useCurrentLocation()">📍 ใช้ตำแหน่งปัจจุบัน</button><div class="grow"></div><button class="btn primary" onclick="saveHomeLocation()">🏠 ยืนยันว่าหมุดนี้คือบ้านของฉัน</button></div>
+  <div id="gpsInfo" class="notice" style="margin-top:12px">กรุณาเลือกตำแหน่งบ้าน</div>
+  </div></div>`;
+  setTimeout(initMap,80);
+}
+function closeLocationModal(){if(state.map){state.map.remove();state.map=null}document.getElementById('modalHost').innerHTML=''}
+function initMap(){
+  if(!window.L) return toast('โหลดแผนที่ไม่สำเร็จ');
+  state.map=L.map('map').setView(APP_CONFIG.DEFAULT_CENTER,13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(state.map);
+  state.marker=L.marker(APP_CONFIG.DEFAULT_CENTER,{draggable:true}).addTo(state.map);
+  state.homeLocation={lat:APP_CONFIG.DEFAULT_CENTER[0],lng:APP_CONFIG.DEFAULT_CENTER[1],accuracy:null,source:'MANUAL'};
+  state.marker.on('dragend',e=>setHome(e.target.getLatLng().lat,e.target.getLatLng().lng,null,'MANUAL'));
+  state.map.on('click',e=>setHome(e.latlng.lat,e.latlng.lng,null,'MANUAL'));
+}
+function setHome(lat,lng,accuracy,source){
+  state.homeLocation={lat,lng,accuracy,source};state.marker?.setLatLng([lat,lng]);state.map?.panTo([lat,lng]);
+  document.getElementById('gpsInfo').textContent=`ตำแหน่งที่เลือก: ${lat.toFixed(6)}, ${lng.toFixed(6)}${accuracy?` • ความแม่นยำประมาณ ${Math.round(accuracy)} ม.`:''}`;
+}
+function useCurrentLocation(){
+  if(!navigator.geolocation) return toast('อุปกรณ์นี้ไม่รองรับตำแหน่ง');
+  navigator.geolocation.getCurrentPosition(p=>{
+    const {latitude,longitude,accuracy}=p.coords;setHome(latitude,longitude,accuracy,'GEOLOCATION');state.map.setView([latitude,longitude],17)
+  },()=>toast('ไม่สามารถใช้ตำแหน่งปัจจุบัน กรุณาอนุญาต Location หรือปักหมุดด้วยตนเอง'),{enableHighAccuracy:true,timeout:12000,maximumAge:0});
+}
+async function saveHomeLocation(){
+  if(!state.homeLocation) return toast('กรุณาเลือกตำแหน่งบ้าน');
+  try{
+    await api('saveHomeLocation',{idToken:state.liffIdToken,homeLat:state.homeLocation.lat,homeLng:state.homeLocation.lng,gpsAccuracy:state.homeLocation.accuracy,locationSource:state.homeLocation.source,confirmed:true},false);
+    closeLocationModal();toast('บันทึกตำแหน่งบ้านแล้ว');loadMyQueue();
+  }catch(e){toast(e.message)}
+}
+
+// startup
+(function init(){
+  document.getElementById('facilityTitle').textContent=APP_CONFIG.FACILITY_NAME;
+  document.getElementById('pFacility').textContent=APP_CONFIG.FACILITY_NAME;
+  document.getElementById('configWarn').classList.toggle('hidden',isConfigured());
+  const qs=new URLSearchParams(location.search);
+  if(qs.get('mode')==='patient'){switchLogin('patient');startPatientLiff()}
+  else if(state.token && state.user && isConfigured()) enterStaff();
+})();
+</script>
+</body>
+</html>
