@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <style>
 :root{
@@ -137,7 +138,7 @@ th,td{padding:12px 11px;text-align:left;border-bottom:1px solid #e7f3f9;font-siz
       </section>
 
       <section id="page-patients" class="page hidden">
-        <div class="pagehead"><div><h2>ผู้ป่วย</h2><p>ข้อมูลสำหรับผูก LINE และพิกัดบ้าน โดยแสดงข้อมูลเท่าที่จำเป็น</p></div><div class="row"><button id="mysqlImportBtn" class="btn primary hidden" onclick="importPatientsFromMySql()">⬇ นำเข้าจาก MySQL</button><button class="btn" onclick="loadPatients()">↻ อัปเดต</button></div></div>
+        <div class="pagehead"><div><h2>ผู้ป่วย</h2><p>ข้อมูลสำหรับผูก LINE และพิกัดบ้าน โดยแสดงข้อมูลเท่าที่จำเป็น</p></div><div class="row"><input id="excelPatientFile" class="hidden" type="file" accept=".xlsx,.xls" onchange="importPatientsFromExcel(this.files[0])"><button id="excelImportBtn" class="btn primary hidden" onclick="document.getElementById('excelPatientFile').click()">⬇ นำเข้าจาก Excel</button><button class="btn" onclick="loadPatients()">↻ อัปเดต</button></div></div>
         <div class="card"><div id="patientTable" class="empty">ยังไม่ได้โหลดข้อมูลผู้ป่วย</div></div>
       </section>
 
@@ -354,7 +355,7 @@ function enterStaff(){
   document.getElementById('patientApp').classList.add('hidden');
   document.getElementById('staffApp').classList.remove('hidden');
   document.getElementById('staffName').textContent=state.user?.displayName||state.user?.username||'เจ้าหน้าที่';
-  document.getElementById('mysqlImportBtn').classList.toggle('hidden',state.user?.role!=='ADMIN');
+  document.getElementById('excelImportBtn').classList.toggle('hidden',state.user?.role!=='ADMIN');
   if(state.user?.forceChangePassword) openForcePasswordModal();
   else {loadDashboard();startPoll()}
 }
@@ -536,18 +537,54 @@ async function startPatientLiff(){
     if(verify.linked){document.getElementById('patientRegister').classList.add('hidden');document.getElementById('patientQueueCard').classList.remove('hidden');await loadMyQueue()}
   }catch(e){toast(e.message||'ไม่สามารถเปิด LIFF ได้')}
 }
-async function importPatientsFromMySql(){
+function excelHeaderKey(value){
+  return String(value||'').trim().toLowerCase().replace(/[\s_.\-/]/g,'');
+}
+function excelColumnIndex(headers,aliases){
+  const keys=aliases.map(excelHeaderKey);
+  return headers.findIndex(h=>keys.includes(excelHeaderKey(h)));
+}
+async function importPatientsFromExcel(file){
   if(state.user?.role!=='ADMIN') return toast('เฉพาะผู้ดูแลระบบเท่านั้นที่นำเข้าข้อมูลได้');
-  if(!confirm('ระบบจะนำเข้าเฉพาะ HN ที่ยังไม่มีใน PATIENTS ต้องการดำเนินการหรือไม่?')) return;
-  const btn=document.getElementById('mysqlImportBtn');
+  if(!file) return;
+  if(!window.XLSX) return toast('โหลดเครื่องมืออ่าน Excel ไม่สำเร็จ กรุณาลองใหม่');
+  if(!confirm('ระบบจะอ่านชีตแรกและเพิ่มเฉพาะ HN ที่ยังไม่มีใน PATIENTS ต้องการดำเนินการหรือไม่?')){document.getElementById('excelPatientFile').value='';return}
+  const btn=document.getElementById('excelImportBtn');
   const oldText=btn.textContent;
   btn.disabled=true;btn.innerHTML='<span class="spinner" style="display:inline-block;vertical-align:middle;margin-right:7px"></span> กำลังนำเข้า...';
   try{
-    const r=await api('importPatientsFromMySql',{});
-    toast('นำเข้าใหม่ '+r.imported+' ราย • HN ซ้ำ '+r.duplicates+' ราย • ข้อมูลไม่ครบ '+r.invalid+' ราย');
+    const data=await file.arrayBuffer();
+    const workbook=XLSX.read(data,{type:'array',cellDates:true});
+    const sheet=workbook.Sheets[workbook.SheetNames[0]];
+    const table=XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false,dateNF:'yyyy-mm-dd'});
+    if(table.length<2) throw new Error('ไฟล์ Excel ไม่มีข้อมูลสำหรับนำเข้า');
+    const headers=table[0];
+    const col={
+      hn:excelColumnIndex(headers,['hn','pid','เลขhn']),
+      fullName:excelColumnIndex(headers,['fullname','name','ชื่อสกุล','ชื่อ-สกุล','ชื่อ นามสกุล']),
+      prefix:excelColumnIndex(headers,['prename','pname','คำนำหน้า']),
+      firstName:excelColumnIndex(headers,['fname','firstname','ชื่อ']),
+      lastName:excelColumnIndex(headers,['lname','lastname','นามสกุล']),
+      phone:excelColumnIndex(headers,['telephone','mobile','phone','informtel','โทรศัพท์','เบอร์โทร']),
+      dob:excelColumnIndex(headers,['birth','birthday','dob','dateofbirth','วันเกิด']),
+      idcard:excelColumnIndex(headers,['idcard','cid','เลขบัตรประชาชน'])
+    };
+    if(col.hn<0||(col.fullName<0&&col.firstName<0)) throw new Error('ไม่พบคอลัมน์ HN/pid และชื่อผู้ป่วยในไฟล์ Excel');
+    const patients=table.slice(1).map(row=>{
+      const prefix=col.prefix>=0?String(row[col.prefix]||'').trim():'';
+      const fullName=col.fullName>=0?String(row[col.fullName]||'').trim():[prefix,col.firstName>=0?row[col.firstName]:'',col.lastName>=0?row[col.lastName]:''].join(' ').replace(/\s+/g,' ').trim();
+      return {hn:String(row[col.hn]||'').trim(),fullName,phone:col.phone>=0?String(row[col.phone]||''):'',dob:col.dob>=0?String(row[col.dob]||''):'',idLast4:col.idcard>=0?String(row[col.idcard]||'').replace(/\D/g,'').slice(-4):''};
+    });
+    let imported=0,duplicates=0,invalid=0;
+    for(let i=0;i<patients.length;i+=500){
+      const r=await api('importPatientsFromExcel',{patients:patients.slice(i,i+500)});
+      imported+=Number(r.imported||0);duplicates+=Number(r.duplicates||0);invalid+=Number(r.invalid||0);
+      btn.textContent=`กำลังนำเข้า ${Math.min(i+500,patients.length)}/${patients.length}`;
+    }
+    toast('นำเข้าใหม่ '+imported+' ราย • HN ซ้ำ '+duplicates+' ราย • ข้อมูลไม่ครบ '+invalid+' ราย');
     await loadPatients();
   }catch(e){toast(e.message)}
-  finally{btn.disabled=false;btn.textContent=oldText}
+  finally{btn.disabled=false;btn.textContent=oldText;document.getElementById('excelPatientFile').value=''}
 }
 function toggleNoPhone(show){
   document.getElementById('knownHnFields').classList.toggle('hidden',show);
