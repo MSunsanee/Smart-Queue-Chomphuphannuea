@@ -93,7 +93,7 @@ th,td{padding:12px 11px;text-align:left;border-bottom:1px solid #e7f3f9;font-siz
       <div class="field"><label>ชื่อผู้ใช้</label><input id="username" class="input" value="admin" autocomplete="username"></div>
       <div class="field" style="margin-top:12px"><label>รหัสผ่าน</label><input id="password" class="input" type="password" autocomplete="current-password"></div>
       <button class="btn primary" style="width:100%;margin-top:16px" onclick="staffLoginAction()">เข้าสู่ระบบ</button>
-      <div class="notice" style="margin-top:14px">บัญชีเริ่มต้นตามข้อกำหนด: admin / 1234 และควรถูกบังคับเปลี่ยนรหัสผ่านหลังเข้าใช้ครั้งแรก</div>
+      <div class="notice" style="margin-top:14px">บัญชีผู้ดูแลใช้รหัสผ่านชั่วคราวที่ระบบแสดงระหว่างการติดตั้ง และต้องเปลี่ยนรหัสผ่านเมื่อเข้าใช้ครั้งแรก</div>
     </div>
     <div id="patientLogin" class="hidden">
       <button class="btn primary" style="width:100%" onclick="startPatientLiff()">เปิดผ่าน LINE เพื่อรับคิว</button>
@@ -137,7 +137,7 @@ th,td{padding:12px 11px;text-align:left;border-bottom:1px solid #e7f3f9;font-siz
       </section>
 
       <section id="page-patients" class="page hidden">
-        <div class="pagehead"><div><h2>ผู้ป่วย</h2><p>ข้อมูลสำหรับผูก LINE และพิกัดบ้าน โดยแสดงข้อมูลเท่าที่จำเป็น</p></div><button class="btn" onclick="loadPatients()">↻ อัปเดต</button></div>
+        <div class="pagehead"><div><h2>ผู้ป่วย</h2><p>ข้อมูลสำหรับผูก LINE และพิกัดบ้าน โดยแสดงข้อมูลเท่าที่จำเป็น</p></div><div class="row"><button id="mysqlImportBtn" class="btn primary hidden" onclick="importPatientsFromMySql()">⬇ นำเข้าจาก MySQL</button><button class="btn" onclick="loadPatients()">↻ อัปเดต</button></div></div>
         <div class="card"><div id="patientTable" class="empty">ยังไม่ได้โหลดข้อมูลผู้ป่วย</div></div>
       </section>
 
@@ -185,10 +185,23 @@ th,td{padding:12px 11px;text-align:left;border-bottom:1px solid #e7f3f9;font-siz
     </div>
     <div id="patientRegister" class="patient-card">
       <h3 style="margin-top:0">ลงทะเบียนรับแจ้งเตือนคิว</h3>
-      <div class="field"><label>HN</label><input id="pHN" class="input" placeholder="เช่น 001234"></div>
-      <div class="field" style="margin-top:12px"><label>เลขท้ายโทรศัพท์ 4 ตัว</label><input id="pPhone4" class="input" inputmode="numeric" maxlength="4" placeholder="เช่น 6789"></div>
+      <div id="knownHnFields">
+        <div class="field"><label>ชื่อ–นามสกุลตามทะเบียน</label><input id="pFullName" class="input" autocomplete="name" placeholder="เช่น สมชาย ใจดี (ไม่ต้องใส่คำนำหน้าก็ได้)"></div>
+        <div class="field" style="margin-top:12px"><label>วันเดือนปีเกิด</label><input id="pDOB" class="input" type="date"></div>
+        <div class="field" style="margin-top:12px"><label>เบอร์โทรศัพท์ 10 หลัก</label><input id="pFullPhone" class="input" inputmode="tel" maxlength="10" placeholder="เช่น 0812345678"></div>
+        <button class="btn" style="width:100%;margin-top:12px" onclick="toggleNoPhone(true)">ไม่มีเบอร์โทรศัพท์ในระบบ</button>
+      </div>
+      <div id="noPhoneFields" class="hidden" style="margin-top:14px;padding:14px;border-radius:18px;background:#eef8fd">
+        <strong>เพิ่มเบอร์โทรศัพท์ครั้งแรก</strong>
+        <div class="field" style="margin-top:10px"><label>ชื่อ–นามสกุลตามทะเบียน</label><input id="npFullName" class="input" autocomplete="name" placeholder="เช่น สมชาย ใจดี (ไม่ต้องใส่คำนำหน้าก็ได้)"></div>
+        <div class="field" style="margin-top:12px"><label>วันเดือนปีเกิด</label><input id="npDOB" class="input" type="date"></div>
+        <div class="field" style="margin-top:12px"><label>เลขบัตรประชาชน 4 ตัวท้าย</label><input id="npId4" class="input" inputmode="numeric" maxlength="4" placeholder="เช่น 2194"></div>
+        <div class="field" style="margin-top:12px"><label>เบอร์โทรศัพท์ใหม่ 10 หลัก</label><input id="npPhone" class="input" inputmode="tel" maxlength="10" placeholder="เช่น 0812345678"></div>
+        <button class="btn" style="width:100%;margin-top:8px" onclick="toggleNoPhone(false)">กลับไปลงทะเบียนปกติ</button>
+      </div>
       <label class="row" style="align-items:flex-start;margin-top:14px"><input id="pConsent" type="checkbox" style="margin-top:4px"><span style="font-size:13px;color:var(--muted)">ยินยอมให้หน่วยบริการใช้ข้อมูลนัดหมาย เลขคิว พิกัดบ้าน และ LINE เพื่อคำนวณเวลาเดินทางและแจ้งเตือนการรับบริการเท่านั้น</span></label>
-      <button class="btn primary" style="width:100%;margin-top:14px" onclick="linkPatient()">ยืนยันการลงทะเบียน</button>
+      <button id="knownHnSubmit" class="btn primary" style="width:100%;margin-top:14px" onclick="linkPatientWithoutHn()">ยืนยันการลงทะเบียน</button>
+      <button id="noPhoneSubmit" class="btn primary hidden" style="width:100%;margin-top:14px" onclick="registerPatientPhone()">ยืนยันตัวตนและบันทึกเบอร์โทร</button>
     </div>
 
     <div id="patientQueueCard" class="patient-card hidden">
@@ -283,7 +296,16 @@ async function api(action,payload={},withAuth=true){
     });
     const text=await r.text();
     let j; try{j=JSON.parse(text)}catch(_){throw new Error('Backend ไม่ได้ส่ง JSON กลับมา')}
-    if(!j.ok) throw new Error(j.error?.message||'เกิดข้อผิดพลาดจาก Backend');
+    if(!j.ok){
+      const err=new Error(j.error?.message||'เกิดข้อผิดพลาดจาก Backend');
+      err.code=j.error?.code||'BACKEND_ERROR';
+      if(err.code==='PASSWORD_CHANGE_REQUIRED'&&state.token){
+        state.user=state.user||{};state.user.forceChangePassword=true;
+        localStorage.setItem('sq_user',JSON.stringify(state.user));
+        setTimeout(openForcePasswordModal,0);
+      }
+      throw err;
+    }
     return j.data;
   }catch(error){
     if(error?.name==='AbortError'){
@@ -308,9 +330,9 @@ async function staffLoginAction(){
   try{
     const data=await api('login',{username,password},false);
     state.token=data.sessionToken; state.user=data.user;
+    state.user.forceChangePassword=!!data.forceChangePassword;
     localStorage.setItem('sq_session',state.token); localStorage.setItem('sq_user',JSON.stringify(state.user));
     enterStaff();
-    if(data.forceChangePassword) toast('กรุณาเปลี่ยนรหัสผ่านเริ่มต้นหลังเข้าใช้งาน');
   }catch(e){toast(e.message)}
 }
 function enterStaff(){
@@ -318,8 +340,37 @@ function enterStaff(){
   document.getElementById('patientApp').classList.add('hidden');
   document.getElementById('staffApp').classList.remove('hidden');
   document.getElementById('staffName').textContent=state.user?.displayName||state.user?.username||'เจ้าหน้าที่';
-  loadDashboard();
-  startPoll();
+  document.getElementById('mysqlImportBtn').classList.toggle('hidden',state.user?.role!=='ADMIN');
+  if(state.user?.forceChangePassword) openForcePasswordModal();
+  else {loadDashboard();startPoll()}
+}
+
+function openForcePasswordModal(){
+  document.getElementById('modalHost').innerHTML=`<div class="modalback"><div class="modal" style="width:min(480px,100%)">
+    <h3 style="margin-top:0">🔐 เปลี่ยนรหัสผ่านเริ่มต้น</h3>
+    <p style="color:var(--muted)">เพื่อความปลอดภัย กรุณาเปลี่ยนรหัสผ่านก่อนใช้งานระบบ</p>
+    <div class="field"><label>รหัสผ่านเดิม</label><input id="cpOld" class="input" type="password" autocomplete="current-password"></div>
+    <div class="field" style="margin-top:12px"><label>รหัสผ่านใหม่</label><input id="cpNew" class="input" type="password" autocomplete="new-password"></div>
+    <div class="field" style="margin-top:12px"><label>ยืนยันรหัสผ่านใหม่</label><input id="cpConfirm" class="input" type="password" autocomplete="new-password"></div>
+    <div class="notice" style="margin-top:12px">อย่างน้อย 10 ตัวอักษร และต้องมีตัวอักษร ตัวเลข และอักขระพิเศษ</div>
+    <button id="cpSubmit" class="btn primary" style="width:100%;margin-top:14px" onclick="submitForcedPasswordChange()">บันทึกรหัสผ่านใหม่</button>
+  </div></div>`;
+}
+
+async function submitForcedPasswordChange(){
+  const oldPassword=document.getElementById('cpOld').value;
+  const newPassword=document.getElementById('cpNew').value;
+  const confirmPassword=document.getElementById('cpConfirm').value;
+  if(newPassword!==confirmPassword) return toast('รหัสผ่านใหม่และการยืนยันไม่ตรงกัน');
+  const btn=document.getElementById('cpSubmit');btn.disabled=true;
+  try{
+    await api('changePassword',{oldPassword,newPassword});
+    state.user.forceChangePassword=false;
+    localStorage.setItem('sq_user',JSON.stringify(state.user));
+    document.getElementById('modalHost').innerHTML='';
+    toast('เปลี่ยนรหัสผ่านสำเร็จ');
+    loadDashboard();startPoll();
+  }catch(e){toast(e.message);btn.disabled=false}
 }
 function logout(){
   try{ if(state.token) api('logout',{},true).catch(()=>{}); }catch(_){}
@@ -459,7 +510,10 @@ async function startPatientLiff(){
   if(!APP_CONFIG.LIFF_ID || APP_CONFIG.LIFF_ID.includes('PASTE_')) return toast('กรุณาตั้งค่า LIFF_ID ก่อน');
   try{
     await liff.init({liffId:APP_CONFIG.LIFF_ID});
-    if(!liff.isLoggedIn()){liff.login({redirectUri:window.location.href});return}
+    // Let LINE use the LIFF Endpoint URL configured in LINE Developers.
+    // Passing window.location.href can include transient LIFF query parameters
+    // and may cause LINE Login to reject the redirect with HTTP 400.
+    if(!liff.isLoggedIn()){liff.login();return}
     state.liffIdToken=liff.getIDToken()||'';
     const verify=await api('verifyLineIdentity',{idToken:state.liffIdToken},false);
     state.patientLinked=!!verify.linked;
@@ -468,12 +522,54 @@ async function startPatientLiff(){
     if(verify.linked){document.getElementById('patientRegister').classList.add('hidden');document.getElementById('patientQueueCard').classList.remove('hidden');await loadMyQueue()}
   }catch(e){toast(e.message||'ไม่สามารถเปิด LIFF ได้')}
 }
-async function linkPatient(){
-  if(!pConsent.checked) return toast('กรุณายินยอมก่อนลงทะเบียน');
-  if(!pHN.value.trim()||pPhone4.value.trim().length!==4) return toast('กรุณากรอก HN และเลขท้ายโทรศัพท์ 4 ตัว');
+async function importPatientsFromMySql(){
+  if(state.user?.role!=='ADMIN') return toast('เฉพาะผู้ดูแลระบบเท่านั้นที่นำเข้าข้อมูลได้');
+  if(!confirm('ระบบจะนำเข้าเฉพาะ HN ที่ยังไม่มีใน PATIENTS ต้องการดำเนินการหรือไม่?')) return;
+  const btn=document.getElementById('mysqlImportBtn');
+  const oldText=btn.textContent;
+  btn.disabled=true;btn.innerHTML='<span class="spinner" style="display:inline-block;vertical-align:middle;margin-right:7px"></span> กำลังนำเข้า...';
   try{
-    await api('linkPatient',{idToken:state.liffIdToken,hn:pHN.value.trim(),phoneLast4:pPhone4.value.trim(),consent:true,consentVersion:'1.0'},false);
-    document.getElementById('patientRegister').classList.add('hidden');document.getElementById('patientQueueCard').classList.remove('hidden');toast('ลงทะเบียนสำเร็จ');await loadMyQueue();
+    const r=await api('importPatientsFromMySql',{});
+    toast('นำเข้าใหม่ '+r.imported+' ราย • HN ซ้ำ '+r.duplicates+' ราย • ข้อมูลไม่ครบ '+r.invalid+' ราย');
+    await loadPatients();
+  }catch(e){toast(e.message)}
+  finally{btn.disabled=false;btn.textContent=oldText}
+}
+function toggleNoPhone(show){
+  document.getElementById('knownHnFields').classList.toggle('hidden',show);
+  document.getElementById('noPhoneFields').classList.toggle('hidden',!show);
+  document.getElementById('knownHnSubmit').classList.toggle('hidden',show);
+  document.getElementById('noPhoneSubmit').classList.toggle('hidden',!show);
+}
+async function registerPatientPhone(){
+  const fullName=String(document.getElementById('npFullName').value||'').trim().replace(/\s+/g,' ');
+  const dob=document.getElementById('npDOB').value;
+  const idLast4=String(document.getElementById('npId4').value||'').replace(/\D/g,'');
+  const phone=String(document.getElementById('npPhone').value||'').replace(/\D/g,'');
+  const consent=document.getElementById('pConsent');
+  if(!consent.checked) return toast('กรุณายินยอมก่อนลงทะเบียน');
+  if(!fullName||!dob||idLast4.length!==4||phone.length!==10) return toast('กรุณากรอกชื่อ–นามสกุล วันเกิด เลขบัตร 4 ตัวท้าย และเบอร์โทรศัพท์ให้ครบ');
+  try{
+    await api('registerPatientPhoneAndLink',{idToken:state.liffIdToken,fullName,dob,idLast4,phone,consent:true,consentVersion:'1.0'},false);
+    document.getElementById('patientRegister').classList.add('hidden');
+    document.getElementById('patientQueueCard').classList.remove('hidden');
+    toast('บันทึกเบอร์โทรศัพท์และลงทะเบียนสำเร็จ');
+    await loadMyQueue();
+  }catch(e){toast(e.message)}
+}
+async function linkPatientWithoutHn(){
+  const fullName=String(document.getElementById('pFullName').value||'').trim().replace(/\s+/g,' ');
+  const phone=String(document.getElementById('pFullPhone').value||'').replace(/\D/g,'');
+  const dob=document.getElementById('pDOB').value;
+  const consent=document.getElementById('pConsent');
+  if(!consent.checked) return toast('กรุณายินยอมก่อนลงทะเบียน');
+  if(!fullName||phone.length!==10||!dob) return toast('กรุณากรอกชื่อ–นามสกุล เบอร์โทรศัพท์ 10 หลัก และวันเดือนปีเกิด');
+  try{
+    await api('linkPatientByIdentity',{idToken:state.liffIdToken,fullName,phone,dob,consent:true,consentVersion:'1.0'},false);
+    document.getElementById('patientRegister').classList.add('hidden');
+    document.getElementById('patientQueueCard').classList.remove('hidden');
+    toast('ยืนยันตัวตนและลงทะเบียนสำเร็จ');
+    await loadMyQueue();
   }catch(e){toast(e.message)}
 }
 async function loadMyQueue(){
