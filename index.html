@@ -551,6 +551,7 @@ async function importPatientsFromExcel(file){
   if(!confirm('ระบบจะอ่านชีตแรกและเพิ่มเฉพาะ HN ที่ยังไม่มีใน PATIENTS ต้องการดำเนินการหรือไม่?')){document.getElementById('excelPatientFile').value='';return}
   const btn=document.getElementById('excelImportBtn');
   const oldText=btn.textContent;
+  let completed=false;
   btn.disabled=true;btn.innerHTML='<span class="spinner" style="display:inline-block;vertical-align:middle;margin-right:7px"></span> กำลังนำเข้า...';
   try{
     const data=await file.arrayBuffer();
@@ -576,15 +577,37 @@ async function importPatientsFromExcel(file){
       return {hn:String(row[col.hn]||'').trim(),fullName,phone:col.phone>=0?String(row[col.phone]||''):'',dob:col.dob>=0?String(row[col.dob]||''):'',idLast4:col.idcard>=0?String(row[col.idcard]||'').replace(/\D/g,'').slice(-4):''};
     });
     let imported=0,duplicates=0,invalid=0;
-    for(let i=0;i<patients.length;i+=500){
-      const r=await api('importPatientsFromExcel',{patients:patients.slice(i,i+500)});
+    const batchSize=200;
+    for(let i=0;i<patients.length;i+=batchSize){
+      const batch=patients.slice(i,i+batchSize);
+      let r,lastError;
+      for(let attempt=1;attempt<=4;attempt++){
+        try{
+          r=await api('importPatientsFromExcel',{patients:batch});
+          break;
+        }catch(error){
+          lastError=error;
+          if(error?.code==='UNAUTHORIZED'||error?.code==='FORBIDDEN') throw error;
+          btn.textContent=`เชื่อมต่อใหม่ ${attempt}/4 • ${i}/${patients.length}`;
+          await new Promise(resolve=>setTimeout(resolve,attempt*1500));
+        }
+      }
+      if(!r) throw new Error(`นำเข้าหยุดที่ ${i}/${patients.length} ราย: ${lastError?.message||'Backend ไม่ตอบกลับ'}`);
       imported+=Number(r.imported||0);duplicates+=Number(r.duplicates||0);invalid+=Number(r.invalid||0);
-      btn.textContent=`กำลังนำเข้า ${Math.min(i+500,patients.length)}/${patients.length}`;
+      btn.textContent=`กำลังนำเข้า ${Math.min(i+batchSize,patients.length)}/${patients.length}`;
+      await new Promise(resolve=>setTimeout(resolve,250));
     }
+    completed=true;
     toast('นำเข้าใหม่ '+imported+' ราย • HN ซ้ำ '+duplicates+' ราย • ข้อมูลไม่ครบ '+invalid+' ราย');
     await loadPatients();
-  }catch(e){toast(e.message)}
-  finally{btn.disabled=false;btn.textContent=oldText;document.getElementById('excelPatientFile').value=''}
+  }catch(e){
+    toast(e.message+' — เลือกไฟล์เดิมเพื่อนำเข้าต่อได้');
+    btn.textContent='↻ นำเข้าต่อจาก Excel';
+  }finally{
+    btn.disabled=false;
+    if(completed) btn.textContent=oldText;
+    document.getElementById('excelPatientFile').value='';
+  }
 }
 function toggleNoPhone(show){
   document.getElementById('knownHnFields').classList.toggle('hidden',show);
