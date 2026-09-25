@@ -187,14 +187,14 @@ th,td{padding:12px 11px;text-align:left;border-bottom:1px solid #e7f3f9;font-siz
       <h3 style="margin-top:0">ลงทะเบียนรับแจ้งเตือนคิว</h3>
       <div id="knownHnFields">
         <div class="field"><label>ชื่อ–นามสกุลตามทะเบียน</label><input id="pFullName" class="input" autocomplete="name" placeholder="เช่น สมชาย ใจดี (ไม่ต้องใส่คำนำหน้าก็ได้)"></div>
-        <div class="field" style="margin-top:12px"><label>วันเดือนปีเกิด</label><input id="pDOB" class="input" type="date"></div>
+        <div class="field" style="margin-top:12px"><label>วันเดือนปีเกิด (พ.ศ.)</label><input id="pDOB" class="input" type="text" inputmode="numeric" maxlength="10" placeholder="วว/ดด/พ.ศ. เช่น 02/05/2523" oninput="formatThaiDateInput(this)"></div>
         <div class="field" style="margin-top:12px"><label>เบอร์โทรศัพท์ 10 หลัก</label><input id="pFullPhone" class="input" inputmode="tel" maxlength="10" placeholder="เช่น 0812345678"></div>
         <button class="btn" style="width:100%;margin-top:12px" onclick="toggleNoPhone(true)">ไม่มีเบอร์โทรศัพท์ในระบบ</button>
       </div>
       <div id="noPhoneFields" class="hidden" style="margin-top:14px;padding:14px;border-radius:18px;background:#eef8fd">
         <strong>เพิ่มเบอร์โทรศัพท์ครั้งแรก</strong>
         <div class="field" style="margin-top:10px"><label>ชื่อ–นามสกุลตามทะเบียน</label><input id="npFullName" class="input" autocomplete="name" placeholder="เช่น สมชาย ใจดี (ไม่ต้องใส่คำนำหน้าก็ได้)"></div>
-        <div class="field" style="margin-top:12px"><label>วันเดือนปีเกิด</label><input id="npDOB" class="input" type="date"></div>
+        <div class="field" style="margin-top:12px"><label>วันเดือนปีเกิด (พ.ศ.)</label><input id="npDOB" class="input" type="text" inputmode="numeric" maxlength="10" placeholder="วว/ดด/พ.ศ. เช่น 02/05/2523" oninput="formatThaiDateInput(this)"></div>
         <div class="field" style="margin-top:12px"><label>เลขบัตรประชาชน 4 ตัวท้าย</label><input id="npId4" class="input" inputmode="numeric" maxlength="4" placeholder="เช่น 2194"></div>
         <div class="field" style="margin-top:12px"><label>เบอร์โทรศัพท์ใหม่ 10 หลัก</label><input id="npPhone" class="input" inputmode="tel" maxlength="10" placeholder="เช่น 0812345678"></div>
         <button class="btn" style="width:100%;margin-top:8px" onclick="toggleNoPhone(false)">กลับไปลงทะเบียนปกติ</button>
@@ -273,6 +273,20 @@ function fmtTime(v){
 function fmtDateTime(v){
   if(!v) return '—'; const d=new Date(v); if(Number.isNaN(d.getTime())) return String(v);
   return new Intl.DateTimeFormat('th-TH',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Bangkok'}).format(d);
+}
+function formatThaiDateInput(el){
+  const digits=String(el.value||'').replace(/\D/g,'').slice(0,8);
+  el.value=digits.length<=2?digits:digits.length<=4?digits.slice(0,2)+'/'+digits.slice(2):digits.slice(0,2)+'/'+digits.slice(2,4)+'/'+digits.slice(4);
+}
+function thaiDobToIso(value){
+  const m=String(value||'').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(!m) return '';
+  const day=Number(m[1]),month=Number(m[2]),buddhistYear=Number(m[3]);
+  const year=buddhistYear-543;
+  if(year<1900||year>new Date().getFullYear()) return '';
+  const test=new Date(Date.UTC(year,month-1,day));
+  if(test.getUTCFullYear()!==year||test.getUTCMonth()!==month-1||test.getUTCDate()!==day) return '';
+  return `${String(year).padStart(4,'0')}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
 }
 function statusBadge(s){
   const x=String(s||'').toUpperCase();
@@ -543,12 +557,13 @@ function toggleNoPhone(show){
 }
 async function registerPatientPhone(){
   const fullName=String(document.getElementById('npFullName').value||'').trim().replace(/\s+/g,' ');
-  const dob=document.getElementById('npDOB').value;
+  const dob=thaiDobToIso(document.getElementById('npDOB').value);
   const idLast4=String(document.getElementById('npId4').value||'').replace(/\D/g,'');
   const phone=String(document.getElementById('npPhone').value||'').replace(/\D/g,'');
   const consent=document.getElementById('pConsent');
   if(!consent.checked) return toast('กรุณายินยอมก่อนลงทะเบียน');
-  if(!fullName||!dob||idLast4.length!==4||phone.length!==10) return toast('กรุณากรอกชื่อ–นามสกุล วันเกิด เลขบัตร 4 ตัวท้าย และเบอร์โทรศัพท์ให้ครบ');
+  if(!dob) return toast('กรุณากรอกวันเกิดเป็น วว/ดด/พ.ศ. เช่น 02/05/2523');
+  if(!fullName||idLast4.length!==4||phone.length!==10) return toast('กรุณากรอกชื่อ–นามสกุล เลขบัตร 4 ตัวท้าย และเบอร์โทรศัพท์ให้ครบ');
   try{
     await api('registerPatientPhoneAndLink',{idToken:state.liffIdToken,fullName,dob,idLast4,phone,consent:true,consentVersion:'1.0'},false);
     document.getElementById('patientRegister').classList.add('hidden');
@@ -560,10 +575,11 @@ async function registerPatientPhone(){
 async function linkPatientWithoutHn(){
   const fullName=String(document.getElementById('pFullName').value||'').trim().replace(/\s+/g,' ');
   const phone=String(document.getElementById('pFullPhone').value||'').replace(/\D/g,'');
-  const dob=document.getElementById('pDOB').value;
+  const dob=thaiDobToIso(document.getElementById('pDOB').value);
   const consent=document.getElementById('pConsent');
   if(!consent.checked) return toast('กรุณายินยอมก่อนลงทะเบียน');
-  if(!fullName||phone.length!==10||!dob) return toast('กรุณากรอกชื่อ–นามสกุล เบอร์โทรศัพท์ 10 หลัก และวันเดือนปีเกิด');
+  if(!dob) return toast('กรุณากรอกวันเกิดเป็น วว/ดด/พ.ศ. เช่น 02/05/2523');
+  if(!fullName||phone.length!==10) return toast('กรุณากรอกชื่อ–นามสกุลและเบอร์โทรศัพท์ 10 หลัก');
   try{
     await api('linkPatientByIdentity',{idToken:state.liffIdToken,fullName,phone,dob,consent:true,consentVersion:'1.0'},false);
     document.getElementById('patientRegister').classList.add('hidden');
